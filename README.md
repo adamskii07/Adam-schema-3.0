@@ -1,0 +1,1 @@
+# Adam-schema-3.0
