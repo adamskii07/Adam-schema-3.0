@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#121b30"><meta name="apple-mobile-web-app-capable" content="yes"><title>Adams schema</title><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="style.css"></head><body>
+<main><header><span class="eyebrow">ADAMS SCHEMA</span><button id="today">Idag</button></header>
+<div class="weeknav"><button id="prev" aria-label="Föregående vecka">‹</button><span id="weeklabel"></span><button id="forward" aria-label="Nästa vecka">›</button></div>
+<nav id="days" aria-label="Välj dag"></nav>
+<section class="hero"><div><p id="date"></p><h1 id="title"></h1><span id="count"></span></div><strong id="percent">0%</strong></section><div class="bar"><div id="bar"></div></div>
+<section id="next" class="next" aria-live="polite"></section><p id="notice" class="notice" hidden></p><p id="storage" class="notice" hidden></p>
+<section><h2>Dagens schema</h2><div id="schedule"></div></section>
+<section><h2>Dagliga mål</h2><p class="hint">Sömn gäller natten som slutade den valda morgonen. Bekräfta 8+ timmar separat.</p><div id="goals"></div></section>
+<section><h2>Veckans träning</h2><div id="training" class="cards"></div><div class="summary"><span>Hela veckans schema</span><strong id="weekpercent"></strong></div><div class="bar"><div id="weekbar"></div></div></section>
+<section><h2>Dina streaks</h2><p class="hint">Dagar i följd, fram till idag eller igår. Historiken följer med över veckorna.</p><div id="streaks" class="cards"></div></section>
+<details><summary>Hudvård för vald dag</summary><div id="skin"></div></details>
+<details><summary>Sparning & säkerhetskopia</summary><p>Avbockningar sparas automatiskt på den här enheten och webbadressen. Exportera regelbundet och innan du byter mobil eller raderar webbplatsdata.</p><button id="export">Exportera säkerhetskopia</button><label class="import">Återställ från säkerhetskopia<input id="import" type="file" accept="application/json,.json"></label><p id="saveinfo" role="status"></p></details>
+<footer>En dag i taget.</footer></main><script src="schedule.js"></script><script src="app.js"></script></body></html>

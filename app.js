@@ -1,0 +1,47 @@
+(() => {
+'use strict';
+const $=id=>document.getElementById(id), names=['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'], short=['Mån','Tis','Ons','Tor','Fre','Lör','Sön'];
+const KEY='adam-schema-v1', fmt=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Stockholm',year:'numeric',month:'2-digit',day:'2-digit'});
+const today=()=>fmt.format(new Date());
+const dateObj=s=>new Date(s+'T12:00:00Z');
+const add=(s,n)=>{const d=dateObj(s);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const weekday=s=>(dateObj(s).getUTCDay()+6)%7;
+const monday=s=>add(s,-weekday(s));
+let selected=today(), week=monday(selected), state={version:1,days:{}}, failed=false;
+function valid(v){return v&&v.version===1&&v.days&&typeof v.days==='object'&&!Array.isArray(v.days)&&Object.entries(v.days).every(([k,x])=>/^\d{4}-\d{2}-\d{2}$/.test(k)&&!isNaN(dateObj(k))&&dateObj(k).toISOString().slice(0,10)===k&&x&&typeof x==='object'&&!Array.isArray(x)&&Object.entries(x).every(([i,b])=>/^(a\d+|sleep|clean)$/.test(i)&&typeof b==='boolean'));}
+try{const raw=localStorage.getItem(KEY);if(raw){const v=JSON.parse(raw);if(!valid(v))throw Error('Ogiltig data');state=v;}}catch(e){failed=true;}
+function storageError(){ $('storage').hidden=!failed; $('storage').textContent='Sparningen fungerar inte just nu. Behåll appen öppen och exportera en säkerhetskopia.'; }
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));failed=false;$('saveinfo').textContent='Sparat automatiskt.';}catch(e){failed=true;}storageError();}
+function done(s,id){return state.days[s]?.[id]===true;}
+function set(s,id,b){if(!state.days[s])state.days[s]={};state.days[s][id]=b;save();render();}
+function rows(s){return SCHEDULE[weekday(s)];}
+function matches(s,tag){return rows(s).filter(a=>a.tags.includes(tag));}
+function goal(s,tag){if(tag==='sleep'||tag==='clean')return done(s,tag);const a=matches(s,tag);return a.length>0&&a.every(x=>done(s,'a'+x.id));}
+function toggleGoal(tag,b){if(tag==='sleep'||tag==='clean')set(selected,tag,b);else{for(const a of matches(selected,tag)){if(!state.days[selected])state.days[selected]={};state.days[selected]['a'+a.id]=b;}save();render();}}
+function percent(s){let total=rows(s).length+2;let n=rows(s).filter(x=>done(s,'a'+x.id)).length+Number(done(s,'sleep'))+Number(done(s,'clean'));return {n,total,p:Math.round(n/total*100)};}
+function streak(tag){const achieved=s=>tag==='skin'?goal(s,'morning')&&goal(s,'evening'):goal(s,tag);let s=today();if(!achieved(s))s=add(s,-1);let n=0;while(achieved(s)&&n<50000){n++;s=add(s,-1);}return n;}
+function card(name,value){const d=document.createElement('div');d.className='card';const t=document.createElement('span'),v=document.createElement('strong');t.textContent=name;v.textContent=value;d.append(t,v);return d;}
+function render(){
+const nowday=today();$('days').replaceChildren();for(let i=0;i<7;i++){const s=add(week,i),b=document.createElement('button');b.className=(s===selected?'selected ':'')+(s===nowday?'today':'');b.setAttribute('aria-pressed',String(s===selected));b.setAttribute('aria-label',names[i]+' '+s);b.innerHTML=short[i]+'<span>'+Number(s.slice(-2))+'</span>';b.onclick=()=>{selected=s;render();};$('days').append(b);}
+$('weeklabel').textContent=week.slice(8)+ '/'+Number(week.slice(5,7))+' – '+add(week,6).slice(8)+'/'+Number(add(week,6).slice(5,7));$('title').textContent=names[weekday(selected)];$('date').textContent=(selected===nowday?'Idag · ':'')+selected;const p=percent(selected);$('percent').textContent=p.p+'%';$('count').textContent=p.n+' av '+p.total+' klara';$('bar').style.width=p.p+'%';
+const time=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
+const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5)), now=minutes(time), a=rows(selected);
+let nextIndex=-1, ongoing=false;
+if(selected===nowday){nextIndex=a.findIndex(x=>{const parts=x.time.split('–');return !done(selected,'a'+x.id)&&parts.length===2&&minutes(parts[0])<=now&&minutes(parts[1])>now;});ongoing=nextIndex>=0;if(nextIndex<0)nextIndex=a.findIndex(x=>!done(selected,'a'+x.id)&&minutes(x.time)>=now);}
+else nextIndex=a.findIndex(x=>!done(selected,'a'+x.id));
+$('next').replaceChildren();const small=document.createElement('small'),strong=document.createElement('strong');small.textContent=ongoing?'PÅGÅR NU':selected===nowday?'NÄSTA AKTIVITET':'NÄSTA OAVBOCKADE';strong.textContent=nextIndex<0?(selected===nowday?'Inga fler planerade aktiviteter idag':'Schemat är klart'):a[nextIndex].time+' · '+a[nextIndex].name;$('next').append(small,strong);
+const overdue=selected===nowday&&a.some(x=>!done(selected,'a'+x.id)&&minutes((x.time.split('–')[1]||x.time))<now);if(overdue){const note=document.createElement('div');note.className='hint';note.textContent='Tidigare aktiviteter kan fortfarande bockas av i listan.';$('next').append(note);}
+$('schedule').replaceChildren();a.forEach((x,i)=>{const l=document.createElement('label');l.className='row'+(done(selected,'a'+x.id)?' done':'')+(i===nextIndex?' current':'');const t=document.createElement('time'),n=document.createElement('span'),c=document.createElement('input');t.textContent=x.time;n.className='activity';n.textContent=x.name;c.type='checkbox';c.checked=done(selected,'a'+x.id);c.setAttribute('aria-label',x.time+' '+x.name);c.onchange=()=>set(selected,'a'+x.id,c.checked);l.append(t,n,c);$('schedule').append(l);});
+$('notice').hidden=weekday(selected)!==1;$('notice').textContent='Tisdagens schema ger cirka 8–8 timmar 10 minuter till uppstigning 07:30. Bekräfta faktisk sömn nästa morgon.';
+$('goals').replaceChildren();for(const [label,tag] of [['8+ timmar sömn','sleep'],['Frukost','breakfast'],['Lunch','lunch'],['Middag','dinner'],['Minst 30 min plugg','study'],['Kvällsbön','prayer'],['Morgonhudvård','morning'],['Kvällshudvård','evening'],['Ingen 18+ under dagen','clean'],['Mobil bort enligt schemat','phone']]){const l=document.createElement('label');l.className='goal';const t=document.createElement('span'),c=document.createElement('input');t.textContent=label;c.type='checkbox';c.checked=goal(selected,tag);c.onchange=()=>toggleGoal(tag,c.checked);l.append(t,c);$('goals').append(l);}
+$('training').replaceChildren();let total=0,n=0;const dates=Array.from({length:7},(_,i)=>add(week,i));dates.forEach(s=>{const v=percent(s);total+=v.total;n+=v.n;});$('weekpercent').textContent=Math.round(n/total*100)+'%';$('weekbar').style.width=Math.round(n/total*100)+'%';for(const [label,tag,max] of [['Egenträning fotboll','football',3],['Lagträning','team',2],['Gym','gym',3],['Sprint / acceleration','sprint',1],['Lugn löpning','run',1]]){const count=dates.reduce((n,s)=>n+matches(s,tag).filter(x=>done(s,'a'+x.id)).length,0);$('training').append(card(label,count+'/'+max));}
+$('streaks').replaceChildren();for(const [label,tag] of [['Plugg','study'],['Bön','prayer'],['Hudvård','skin'],['Sömn 8+ h','sleep'],['Ingen 18+','clean']])$('streaks').append(card(label,streak(tag)+' dagar'));
+const evening=['Rengöring → retinol → CeraVe','Rengöring → azelainsyra → CeraVe','Rengöring → azelainsyra → CeraVe','Rengöring → retinol → CeraVe','Rengöring → azelainsyra → CeraVe','Rengöring → azelainsyra → CeraVe','Rengöring → CeraVe, återhämtningskväll'];$('skin').innerHTML='<h3>Morgon</h3><ol><li>Skölj ansiktet eller mild rengöring</li><li>Azelainsyra</li><li>CeraVe Moisturizing Cream</li><li>SPF 50</li><li>Volufiline endast under ögonen</li></ol><h3>Kväll</h3><p>'+evening[weekday(selected)]+'</p><p>Retinol ska inte läggas nära ögonen. Volufiline används bara under ögonen. Rutinen återger ditt upplägg.</p>';storageError();
+}
+$('prev').onclick=()=>{week=add(week,-7);selected=add(selected,-7);render();};$('forward').onclick=()=>{week=add(week,7);selected=add(selected,7);render();};$('today').onclick=()=>{selected=today();week=monday(selected);render();};
+$('export').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),l=document.createElement('a');l.href=u;l.download='adam-schema-backup-'+today()+'.json';l.click();setTimeout(()=>URL.revokeObjectURL(u),10000);$('saveinfo').textContent='Säkerhetskopian har exporterats. Spara den i Filer.';};
+$('import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>10000000)throw Error('Filen är för stor.');const v=JSON.parse(await f.text());if(!valid(v))throw Error('Filen är inte en giltig säkerhetskopia.');if(!confirm('Återställa säkerhetskopian? Nuvarande avbockningar ersätts.'))return;state=v;save();render();if(!failed)$('saveinfo').textContent='Säkerhetskopian har återställts.';}catch(err){$('saveinfo').textContent=err.message;}finally{e.target.value='';}};
+window.addEventListener('storage',e=>{if(e.key===KEY){try{const v=JSON.parse(e.newValue);if(valid(v)){state=v;render();}}catch(e){}}});
+render();setInterval(()=>{if(week===monday(today())&&selected===add(today(),-1)){selected=today();week=monday(selected);}render();},60000);
+if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{$('saveinfo').textContent='Offlineläget kunde inte aktiveras. Lokal sparning fungerar fortfarande.';});
+})();
